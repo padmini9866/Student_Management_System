@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Student Management System</title>
+<style>
+  :root {
+    --bg: #f4f6fb; --card: #fff; --ink: #1f2937; --muted: #6b7280;
+    --primary: #4f46e5; --primary-d: #4338ca; --danger: #dc2626;
+    --border: #e5e7eb; --ok: #16a34a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         background: var(--bg); color: var(--ink); }
+  header { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; padding: 22px 16px; }
+  header .wrap { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: 1.4rem; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  main { padding: 20px 16px 40px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .stat { background: var(--card); border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .stat b { display: block; font-size: 1.5rem; }
+  .stat span { color: var(--muted); font-size: .85rem; }
+  .toolbar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .toolbar input { flex: 1; min-width: 200px; }
+  input, select { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+                  font-size: .95rem; background: #fff; width: 100%; }
+  input:focus, select:focus { outline: 2px solid #c7d2fe; border-color: var(--primary); }
+  button { cursor: pointer; border: 0; border-radius: 8px; padding: 10px 16px; font-size: .95rem; font-weight: 600; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-d); }
+  .btn-ghost { background: #eef2ff; color: var(--primary); }
+  .btn-danger { background: #fee2e2; color: var(--danger); }
+  .btn-sm { padding: 6px 10px; font-size: .8rem; }
+  .card { background: var(--card); border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 720px; }
+  th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: .92rem; }
+  th { background: #f9fafb; color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }
+  tr:last-child td { border-bottom: 0; }
+  td.actions { white-space: nowrap; display: flex; gap: 6px; }
+  .empty { padding: 40px; text-align: center; color: var(--muted); }
+  .badge { background: #ede9fe; color: #6d28d9; padding: 2px 8px; border-radius: 999px; font-size: .8rem; }
+  .overlay { position: fixed; inset: 0; background: rgba(17,24,39,.5); display: none;
+             align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  .overlay.show { display: flex; }
+  .modal { background: #fff; border-radius: 14px; width: 100%; max-width: 480px; padding: 22px; max-height: 92vh; overflow: auto; }
+  .modal h2 { margin: 0 0 14px; font-size: 1.15rem; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid .full { grid-column: 1 / -1; }
+  label { font-size: .8rem; color: var(--muted); display: block; margin-bottom: 4px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(80px);
+           background: var(--ink); color: #fff; padding: 12px 18px; border-radius: 10px;
+           transition: transform .25s; z-index: 20; max-width: 90vw; }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast.error { background: var(--danger); }
+  #toast.ok { background: var(--ok); }
+  @media (max-width: 520px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>🎓 Student Management System</h1>
+    <button class="btn-primary" style="background:#fff;color:#4f46e5" onclick="openForm()">+ Add Student</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="stats">
+    <div class="stat"><b id="statTotal">0</b><span>Total students</span></div>
+    <div class="stat"><b id="statCourses">0</b><span>Courses</span></div>
+    <div class="stat"><b id="statAge">–</b><span>Average age</span></div>
+  </div>
+
+  <div class="toolbar">
+    <input id="search" type="search" placeholder="Search by ID, name, course or email…">
+  </div>
+
+  <div class="card">
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Name</th><th>Age</th><th>Gender</th><th>Course</th><th>Phone</th><th>Email</th><th>Actions</th></tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div id="empty" class="empty" style="display:none">No students found.</div>
+  </div>
+</main>
+
+<!-- Add / Edit modal -->
+<div class="overlay" id="formOverlay">
+  <form class="modal" id="studentForm">
+    <h2 id="formTitle">Add Student</h2>
+    <input type="hidden" id="sid">
+    <div class="grid">
+      <div class="full"><label>Name *</label><input id="name" required maxlength="100"></div>
+      <div><label>Age *</label><input id="age" type="number" min="1" max="120" required></div>
+      <div><label>Gender</label>
+        <select id="gender"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select>
+      </div>
+      <div class="full"><label>Course</label><input id="course" maxlength="100"></div>
+      <div><label>Phone</label><input id="phone" maxlength="20"></div>
+      <div><label>Email</label><input id="email" type="email" maxlength="100"></div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-ghost" onclick="closeForm()">Cancel</button>
+      <button type="submit" class="btn-primary">Save</button>
+    </div>
+  </form>
+</div>
+
+<!-- Delete modal -->
+<div class="overlay" id="delOverlay">
+  <div class="modal">
+    <h2>Delete student?</h2>
+    <p id="delText" style="color:var(--muted)"></p>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeDel()">Cancel</button>
+      <button class="btn-danger" onclick="confirmDelete()">Yes, delete</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let students = [];
+let deleteId = null;
+const $ = id => document.getElementById(id);
+
+function toast(msg, type = "ok") {
+  const t = $("toast");
+  t.textContent = msg; t.className = "show " + type;
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.className = "", 2800);
+}
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+async function api(url, options = {}) {
+  const res = await fetch(url, { headers: { "Content-Type": "application/json" }, ...options });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Something went wrong");
+  return data;
+}
+
+async function load() {
+  try {
+    const q = $("search").value.trim();
+    students = await api("/api/students" + (q ? "?q=" + encodeURIComponent(q) : ""));
+    render();
+  } catch (e) { toast(e.message, "error"); }
+}
+
+function render() {
+  $("rows").innerHTML = students.map(s => `
+    <tr>
+      <td>${s.id}</td>
+      <td><b>${esc(s.name)}</b></td>
+      <td>${s.age}</td>
+      <td>${esc(s.gender)}</td>
+      <td>${s.course ? `<span class="badge">${esc(s.course)}</span>` : ""}</td>
+      <td>${esc(s.phone)}</td>
+      <td>${esc(s.email)}</td>
+      <td class="actions">
+        <button class="btn-ghost btn-sm" onclick="openForm(${s.id})">Edit</button>
+        <button class="btn-danger btn-sm" onclick="openDel(${s.id})">Delete</button>
+      </td>
+    </tr>`).join("");
+  $("empty").style.display = students.length ? "none" : "block";
+  $("statTotal").textContent = students.length;
+  $("statCourses").textContent = new Set(students.map(s => s.course).filter(Boolean)).size;
+  $("statAge").textContent = students.length
+    ? (students.reduce((a, s) => a + s.age, 0) / students.length).toFixed(1) : "–";
+}
+
+function openForm(id) {
+  const s = students.find(x => x.id === id);
+  $("formTitle").textContent = s ? "Update Student" : "Add Student";
+  $("sid").value = s ? s.id : "";
+  for (const f of ["name", "age", "gender", "course", "phone", "email"]) $(f).value = s ? (s[f] ?? "") : "";
+  $("formOverlay").classList.add("show");
+  $("name").focus();
+}
+function closeForm() { $("formOverlay").classList.remove("show"); }
+
+$("studentForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const id = $("sid").value;
+  const body = JSON.stringify({
+    name: $("name").value, age: $("age").value, gender: $("gender").value,
+    course: $("course").value, phone: $("phone").value, email: $("email").value,
+  });
+  try {
+    const res = await api(id ? `/api/students/${id}` : "/api/students", { method: id ? "PUT" : "POST", body });
+    toast(res.message);
+    closeForm();
+    load();
+  } catch (err) { toast(err.message, "error"); }
+});
+
+function openDel(id) {
+  const s = students.find(x => x.id === id);
+  deleteId = id;
+  $("delText").textContent = `This will permanently remove ${s.name} (ID ${s.id}).`;
+  $("delOverlay").classList.add("show");
+}
+function closeDel() { $("delOverlay").classList.remove("show"); deleteId = null; }
+
+async function confirmDelete() {
+  try {
+    const res = await api(`/api/students/${deleteId}`, { method: "DELETE" });
+    toast(res.message);
+    closeDel();
+    load();
+  } catch (err) { toast(err.message, "error"); }
+}
+
+let timer;
+$("search").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(load, 250); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") { closeForm(); closeDel(); } });
+
+load();
+</script>
+</body>
+</html>
